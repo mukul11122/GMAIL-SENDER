@@ -310,10 +310,35 @@ class Database:
     def get_gmail_accounts(self):
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute('SELECT id, email, is_active, emails_sent_today, last_reset_date FROM gmail_accounts WHERE is_active = 1')
+        cursor.execute('SELECT id, email, password, is_active, emails_sent_today, last_reset_date FROM gmail_accounts')
         rows = cursor.fetchall()
         conn.close()
         return rows
+    
+    def get_all_gmail_accounts_for_dropdown(self):
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT id, email, password FROM gmail_accounts WHERE is_active = 1')
+        rows = cursor.fetchall()
+        conn.close()
+        return rows
+    
+    def get_account_sent_count(self, account_id):
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        today = datetime.now().date().isoformat()
+        cursor.execute('SELECT emails_sent_today FROM gmail_accounts WHERE id = ? AND last_reset_date = ?', (account_id, today))
+        row = cursor.fetchone()
+        conn.close()
+        return row[0] if row else 0
+    
+    def get_specific_gmail_account(self, account_id):
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT id, email, password FROM gmail_accounts WHERE id = ?', (account_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return row
     
     def get_daily_sent_count(self):
         conn = self._get_connection()

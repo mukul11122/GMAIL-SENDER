@@ -26,6 +26,7 @@ class StockEmailSenderApp:
         self._refresh_accounts_list()
         self._refresh_customer_count()
         self._refresh_daily_stats()
+        self._refresh_gmail_dropdown()
     
     def _create_ui(self):
         style = ttk.Style()
@@ -319,6 +320,16 @@ The email body contains a standard message about new stock arrival.
         send_frame = ttk.LabelFrame(parent, text="🚀 SEND EMAILS", padding=15)
         send_frame.grid(row=2, column=0, padx=15, pady=10, sticky='ew')
         
+        gmail_select_frame = ttk.Frame(send_frame)
+        gmail_select_frame.pack(fill='x', pady=5)
+        
+        ttk.Label(gmail_select_frame, text="Select Gmail Account:").pack(side='left', padx=5)
+        self.gmail_combo = ttk.Combobox(gmail_select_frame, width=35, state='readonly')
+        self.gmail_combo.pack(side='left', padx=5)
+        self.gmail_combo.bind('<<ComboboxSelected>>', self._on_gmail_selected)
+        
+        self.gmail_accounts_list = []
+        
         self.send_btn = ttk.Button(send_frame, text="SEND NOW", command=self._start_sending, width=20)
         self.send_btn.pack(side='left', padx=10, pady=5)
         
@@ -366,17 +377,31 @@ The email body contains a standard message about new stock arrival.
     def _refresh_daily_stats(self):
         accounts = self.db.get_gmail_accounts()
         total_sent_today = 0
-        total_limit = len(accounts) * EMAIL_SETTINGS['max_emails_per_account_per_day']
+        active_count = 0
         
         for acc in accounts:
-            acc_id, email, is_active, sent_today, last_reset = acc
-            total_sent_today += sent_today
+            acc_id, email, password, is_active, sent_today, last_reset = acc
+            if is_active:
+                active_count += 1
+                total_sent_today += sent_today
         
+        total_limit = active_count * EMAIL_SETTINGS['max_emails_per_account_per_day']
         remaining = total_limit - total_sent_today
         
         self.daily_sent_label.config(text=f"Sent Today: {total_sent_today}")
         self.daily_limit_label.config(text=f"Daily Limit: {total_limit}")
         self.daily_remaining_label.config(text=f"Remaining: {remaining}")
+    
+    def _refresh_gmail_dropdown(self):
+        accounts = self.db.get_all_gmail_accounts_for_dropdown()
+        self.gmail_accounts_list = accounts
+        account_names = [f"{acc[1]} (Sent: {self.db.get_account_sent_count(acc[0])})" for acc in accounts]
+        self.gmail_combo['values'] = account_names
+        if account_names:
+            self.gmail_combo.current(0)
+    
+    def _on_gmail_selected(self, event):
+        pass
         
         if remaining < 50:
             self.daily_remaining_label.config(foreground='#dc3545')
@@ -402,6 +427,7 @@ The email body contains a standard message about new stock arrival.
             self.email_entry.delete(0, tk.END)
             self.password_entry.delete(0, tk.END)
             self._refresh_accounts_list()
+            self._refresh_gmail_dropdown()
         else:
             messagebox.showerror("Error", "Account already exists or failed to add")
     
@@ -444,6 +470,7 @@ The email body contains a standard message about new stock arrival.
         if messagebox.askyesno("Confirm", f"Delete account {email}?"):
             self.db.delete_gmail_account(email)
             self._refresh_accounts_list()
+            self._refresh_gmail_dropdown()
     
     def _refresh_accounts_list(self):
         for item in self.accounts_tree.get_children():
@@ -451,7 +478,9 @@ The email body contains a standard message about new stock arrival.
         
         accounts = self.db.get_gmail_accounts()
         for acc in accounts:
-            acc_id, email, is_active, sent_today, last_reset = acc
+            acc_id, email, password, is_active, sent_today, last_reset = acc
+            if last_reset < datetime.now().date().isoformat():
+                sent_today = 0
             self.accounts_tree.insert('', 'end', values=(
                 email,
                 sent_today,
@@ -862,12 +891,14 @@ The email body contains a standard message about new stock arrival.
             total_sent = 0
             total_failed = 0
             
+            selected_idx = self.gmail_combo.current()
+            if selected_idx < 0 or selected_idx >= len(self.gmail_accounts_list):
+                self._update_progress("Please select a Gmail account")
+                return
+            
+            gmail_account = self.gmail_accounts_list[selected_idx]
+            
             while self.sending:
-                gmail_account = self.db.get_available_gmail_account()
-                if not gmail_account:
-                    self._update_progress("No available Gmail accounts. Daily limits reached.")
-                    break
-                
                 if hasattr(self, 'selected_customer_ids') and self.selected_customer_ids:
                     batch = self.db.get_unsent_customers_by_ids(self.selected_customer_ids)
                     if not batch:
@@ -885,16 +916,25 @@ The email body contains a standard message about new stock arrival.
                 if not batch:
                     break
                 
-                self._update_progress(f"Sending batch of {len(batch)} emails via {gmail_account[1]}...")
+                account_id, email, password = gmail_account
                 
-                for result in self.gmail_service.send_batch(batch, subject, html_template, gmail_account, attachment_path=self.attachment_path):
+                sent_today = self.db.get_account_sent_count(account_id)
+                if sent_today >= EMAIL_SETTINGS['max_emails_per_account_per_day']:
+                    self._update_progress(f"Daily limit reached for {email}")
+                    break
+                
+                self._update_progress(f"Sending batch of {len(batch)} emails via {email}...")
+                
+                account_data = (account_id, email, password)
+                
+                for result in self.gmail_service.send_batch(batch, subject, html_template, account_data, attachment_path=self.attachment_path):
                     if not self.sending:
                         break
                     
                     customer_id, status, account_email = result
                     
                     self.db.log_email(customer_id, account_email, status)
-                    self.db.increment_email_count(gmail_account[0])
+                    self.db.increment_email_count(account_id)
                     
                     if status == 'sent':
                         total_sent += 1
@@ -919,6 +959,7 @@ The email body contains a standard message about new stock arrival.
             self.send_btn.config(state='normal')
             self.stop_btn.config(state='disabled')
             self._refresh_accounts_list()
+            self._refresh_gmail_dropdown()
     
     def _update_progress(self, message):
         self.root.after(0, lambda: self.progress_label.config(text=message))
