@@ -1,0 +1,39 @@
+========================================
+GMAIL STOCK EMAIL SENDER - QUICK START
+========================================
+
+HOW TO USE:
+
+STEP 1 - ADD GMAIL ACCOUNTS:
+  1. Open GmailStockSender.exe
+  2. Go to "Gmail Accounts" tab
+  3. Enter your Gmail address
+  4. Enter App Password (NOT regular password)
+     - Go to https://myaccount.google.com/
+     - Enable 2-Step Verification
+     - Search "App Passwords"
+     - Create new app password for Mail
+     - Copy the 16-character password
+  5. Click "Add Account"
+
+STEP 2 - ADD CUSTOMERS:
+  1. Go to "Customers" tab
+  2. Click "Upload CSV/Excel"
+  3. Select your CSV file
+  4. Format: store_code, email, mobile_number
+
+STEP 3 - SEND EMAILS:
+  1. Go to "Send Emails" tab
+  2. Select Gmail account from dropdown
+  3. Click "Select File" to attach stock file
+  4. Click "SEND NOW"
+
+DAILY LIMITS:
+  - 450 emails per Gmail account per day
+  - Add multiple accounts for more capacity
+
+TIPS:
+  - Gmail accounts are saved forever
+  - Customer data is saved in database
+  - You can track sent history
+
