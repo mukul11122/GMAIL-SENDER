@@ -63,7 +63,9 @@ class GmailService:
         }
         
         for i, customer in enumerate(customers):
-            customer_id, email, store_code, mobile_number = customer[0], customer[1], customer[2], customer[3]
+            customer_id = customer[0]
+            email = customer[1]
+            store_code = customer[2] if len(customer) > 2 else ''
             
             personalized_html = html_content.replace('{{name}}', store_code or 'Customer')
             personalized_html = personalized_html.replace('{{email}}', email)
