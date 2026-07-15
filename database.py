@@ -32,6 +32,7 @@ class Database:
                 gmail_account TEXT,
                 sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 status TEXT,
+                sent_date DATE,
                 FOREIGN KEY (customer_id) REFERENCES customers(id)
             )
         ''')
@@ -176,6 +177,18 @@ class Database:
         conn.close()
         return rows
     
+    def get_sent_dates_for_customer(self, customer_id, days=3):
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT DISTINCT sent_date FROM email_logs 
+            WHERE customer_id = ? AND status = 'sent' AND sent_date IS NOT NULL
+            ORDER BY sent_date DESC LIMIT ?
+        ''', (customer_id, days))
+        dates = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        return dates
+    
     def get_unsent_customers(self, limit=None):
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -268,11 +281,13 @@ class Database:
         return count
     
     def log_email(self, customer_id, gmail_account, status):
+        from datetime import date
         conn = self._get_connection()
         cursor = conn.cursor()
+        today = date.today().isoformat()
         cursor.execute(
-            'INSERT INTO email_logs (customer_id, gmail_account, status) VALUES (?, ?, ?)',
-            (customer_id, gmail_account, status)
+            'INSERT INTO email_logs (customer_id, gmail_account, status, sent_date) VALUES (?, ?, ?, ?)',
+            (customer_id, gmail_account, status, today)
         )
         conn.commit()
         conn.close()

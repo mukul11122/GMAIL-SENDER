@@ -198,19 +198,21 @@ class StockEmailSenderApp:
         search_entry = ttk.Entry(list_toolbar, textvariable=self.search_var, width=20)
         search_entry.pack(side='left')
         
-        columns = ('select', 'store_code', 'email', 'mobile_number', 'status')
+        columns = ('select', 'store_code', 'email', 'mobile_number', 'sent_history', 'status')
         self.customers_tree = ttk.Treeview(list_frame, columns=columns, show='headings', height=15)
         
         self.customers_tree.heading('select', text='Select')
         self.customers_tree.heading('store_code', text='Store Code')
         self.customers_tree.heading('email', text='Email')
         self.customers_tree.heading('mobile_number', text='Mobile Number')
+        self.customers_tree.heading('sent_history', text='Sent (Last 3 Days)')
         self.customers_tree.heading('status', text='Status')
         
         self.customers_tree.column('select', width=50, anchor='center')
-        self.customers_tree.column('store_code', width=100, anchor='center')
-        self.customers_tree.column('email', width=200)
-        self.customers_tree.column('mobile_number', width=120, anchor='center')
+        self.customers_tree.column('store_code', width=80, anchor='center')
+        self.customers_tree.column('email', width=180)
+        self.customers_tree.column('mobile_number', width=100, anchor='center')
+        self.customers_tree.column('sent_history', width=150, anchor='center')
         self.customers_tree.column('status', width=80, anchor='center')
         
         self.customers_tree.grid(row=1, column=0, sticky='nsew')
@@ -243,38 +245,42 @@ class StockEmailSenderApp:
     def _create_stocks_tab(self, parent):
         padding = {'padx': 15, 'pady': 10}
         
-        header = ttk.Label(parent, text="Stock Data Entry", style='Header.TLabel')
+        header = ttk.Label(parent, text="Stock File Attachment", style='Header.TLabel')
         header.grid(row=0, column=0, **padding, sticky='w')
         
-        upload_frame = ttk.LabelFrame(parent, text="Add Stock Data", padding=10)
+        upload_frame = ttk.LabelFrame(parent, text="Select Stock File", padding=20)
         upload_frame.grid(row=1, column=0, padx=15, pady=10, sticky='ew')
         
-        ttk.Label(upload_frame, text="Upload stock file (CSV, Excel .xlsx/.xls, or TXT)", 
-                  font=('Segoe UI', 9, 'italic'), foreground='#666').pack(anchor='w')
-        ttk.Button(upload_frame, text="Upload Stock File", command=self._upload_stocks_csv).pack(pady=5)
+        ttk.Label(upload_frame, text="Select your stock file (Excel or CSV) to attach to emails:", 
+                  font=('Segoe UI', 10)).pack(anchor='w', pady=5)
         
-        ttk.Label(upload_frame, text="Or add stock notes manually:", 
-                  font=('Segoe UI', 9), foreground='#333').pack(anchor='w', pady=(10, 5))
+        ttk.Label(upload_frame, text="Supported formats: .xlsx, .xls, .csv", 
+                  font=('Segoe UI', 9, 'italic'), foreground='#666').pack(anchor='w', pady=5)
         
-        self.stock_text_entry = scrolledtext.ScrolledText(upload_frame, height=4, width=60)
-        self.stock_text_entry.pack(pady=5)
-        self.stock_text_entry.insert('1.0', "Optional: Add notes or highlights about new stock...")
+        self.stock_file_label = ttk.Label(upload_frame, text="No file selected", 
+                                          font=('Segoe UI', 11), foreground='#666')
+        self.stock_file_label.pack(anchor='w', pady=10)
         
-        ttk.Button(upload_frame, text="Add Notes", command=self._add_stock_manual).pack(pady=5)
+        ttk.Button(upload_frame, text="📁 Select Stock File", 
+                   command=self._upload_stocks_csv).pack(pady=10)
         
-        list_frame = ttk.LabelFrame(parent, text="Current Stock Data", padding=10)
-        list_frame.grid(row=2, column=0, padx=15, pady=10, sticky='nsew')
+        ttk.Button(upload_frame, text="🗑 Clear Selection", 
+                   command=self._clear_stocks).pack(pady=5)
         
-        self.stocks_tree = ttk.Treeview(list_frame, columns=('data',), 
-                                        show='headings', height=8)
-        self.stocks_tree.heading('data', text='Stock Information')
-        self.stocks_tree.column('data', width=500)
-        self.stocks_tree.pack(fill='both', expand=True)
+        info_frame = ttk.LabelFrame(parent, text="Instructions", padding=15)
+        info_frame.grid(row=2, column=0, padx=15, pady=10, sticky='ew')
         
-        btn_frame = ttk.Frame(list_frame)
-        btn_frame.pack(fill='x', pady=5)
-        ttk.Button(btn_frame, text="Clear All", command=self._clear_stocks).pack(side='left')
-        ttk.Button(btn_frame, text="Refresh", command=self._refresh_stocks_list).pack(side='left', padx=5)
+        instructions = """
+1. Click "Select Stock File" above
+2. Choose your Excel (.xlsx/.xls) or CSV file
+3. The file will be attached to all emails
+4. Go to "Send Emails" tab to send
+
+Note: The stock file will be sent as an attachment.
+The email body contains a standard message about new stock arrival.
+        """
+        ttk.Label(info_frame, text=instructions, justify='left', 
+                  font=('Segoe UI', 10)).pack(anchor='w')
     
     def _create_send_tab(self, parent):
         padding = {'padx': 15, 'pady': 10}
@@ -283,51 +289,46 @@ class StockEmailSenderApp:
         header.grid(row=0, column=0, **padding, sticky='w')
         
         settings_frame = ttk.LabelFrame(parent, text="Email Settings", padding=10)
-        settings_frame.grid(row=1, column=0, padx=15, pady=10, sticky='ew')
+        settings_frame.grid(row=1, column=0, padx=15, pady=5, sticky='ew')
         
-        ttk.Label(settings_frame, text="Email Subject:").grid(row=0, column=0, sticky='w', pady=3)
+        ttk.Label(settings_frame, text="Email Subject:").grid(row=0, column=0, sticky='w', pady=2)
         self.subject_entry = ttk.Entry(settings_frame, width=50)
         self.subject_entry.insert(0, EMAIL_TEMPLATE['subject'])
-        self.subject_entry.grid(row=0, column=1, padx=5, pady=3, sticky='w')
+        self.subject_entry.grid(row=0, column=1, padx=5, pady=2, sticky='w')
         
-        ttk.Label(settings_frame, text="Short Message:").grid(row=1, column=0, sticky='w', pady=3)
+        ttk.Label(settings_frame, text="Short Message:").grid(row=1, column=0, sticky='w', pady=2)
         self.custom_message_entry = ttk.Entry(settings_frame, width=50)
         self.custom_message_entry.insert(0, "Many new and short items included in the list and marked.")
-        self.custom_message_entry.grid(row=1, column=1, padx=5, pady=3, sticky='w')
+        self.custom_message_entry.grid(row=1, column=1, padx=5, pady=2, sticky='w')
         
-        ttk.Label(settings_frame, text="Batch Size:").grid(row=2, column=0, sticky='w', pady=3)
+        ttk.Label(settings_frame, text="Batch Size:").grid(row=2, column=0, sticky='w', pady=2)
         self.batch_size_entry = ttk.Spinbox(settings_frame, from_=10, to=100, width=10)
         self.batch_size_entry.set(EMAIL_SETTINGS['batch_size'])
-        self.batch_size_entry.grid(row=2, column=1, padx=5, pady=3, sticky='w')
+        self.batch_size_entry.grid(row=2, column=1, padx=5, pady=2, sticky='w')
         
-        ttk.Label(settings_frame, text="Delay Between Emails (sec):").grid(row=3, column=0, sticky='w', pady=3)
+        ttk.Label(settings_frame, text="Delay Between Emails (sec):").grid(row=3, column=0, sticky='w', pady=2)
         self.delay_entry = ttk.Spinbox(settings_frame, from_=1, to=30, width=10)
         self.delay_entry.set(EMAIL_SETTINGS['delay_between_emails'])
-        self.delay_entry.grid(row=3, column=1, padx=5, pady=3, sticky='w')
+        self.delay_entry.grid(row=3, column=1, padx=5, pady=2, sticky='w')
         
-        ttk.Label(settings_frame, text="Delay Between Batches (sec):").grid(row=4, column=0, sticky='w', pady=3)
+        ttk.Label(settings_frame, text="Delay Between Batches (sec):").grid(row=4, column=0, sticky='w', pady=2)
         self.batch_delay_entry = ttk.Spinbox(settings_frame, from_=30, to=300, width=10)
         self.batch_delay_entry.set(EMAIL_SETTINGS['delay_between_batches'])
-        self.batch_delay_entry.grid(row=4, column=1, padx=5, pady=3, sticky='w')
+        self.batch_delay_entry.grid(row=4, column=1, padx=5, pady=2, sticky='w')
+        
+        send_frame = ttk.LabelFrame(parent, text="🚀 SEND EMAILS", padding=15)
+        send_frame.grid(row=2, column=0, padx=15, pady=10, sticky='ew')
+        
+        self.send_btn = ttk.Button(send_frame, text="SEND NOW", command=self._start_sending, width=20)
+        self.send_btn.pack(side='left', padx=10, pady=5)
+        
+        self.stop_btn = ttk.Button(send_frame, text="STOP", command=self._stop_sending, state='disabled', width=10)
+        self.stop_btn.pack(side='left', padx=5, pady=5)
+        
+        ttk.Button(send_frame, text="Refresh", command=self._refresh_customer_count, width=10).pack(side='left', padx=5, pady=5)
         
         attachment_frame = ttk.LabelFrame(parent, text="Stock File Attachment", padding=10)
-        attachment_frame.grid(row=2, column=0, padx=15, pady=10, sticky='ew')
-        self.batch_size_entry = ttk.Spinbox(settings_frame, from_=10, to=100, width=10)
-        self.batch_size_entry.set(EMAIL_SETTINGS['batch_size'])
-        self.batch_size_entry.grid(row=2, column=1, padx=5, pady=3, sticky='w')
-        
-        ttk.Label(settings_frame, text="Delay Between Emails (sec):").grid(row=3, column=0, sticky='w', pady=3)
-        self.delay_entry = ttk.Spinbox(settings_frame, from_=1, to=30, width=10)
-        self.delay_entry.set(EMAIL_SETTINGS['delay_between_emails'])
-        self.delay_entry.grid(row=3, column=1, padx=5, pady=3, sticky='w')
-        
-        ttk.Label(settings_frame, text="Delay Between Batches (sec):").grid(row=4, column=0, sticky='w', pady=3)
-        self.batch_delay_entry = ttk.Spinbox(settings_frame, from_=30, to=300, width=10)
-        self.batch_delay_entry.set(EMAIL_SETTINGS['delay_between_batches'])
-        self.batch_delay_entry.grid(row=4, column=1, padx=5, pady=3, sticky='w')
-        
-        attachment_frame = ttk.LabelFrame(parent, text="Stock File Attachment", padding=10)
-        attachment_frame.grid(row=3, column=0, padx=15, pady=10, sticky='ew')
+        attachment_frame.grid(row=3, column=0, padx=15, pady=5, sticky='ew')
         
         self.attachment_path_label = ttk.Label(attachment_frame, text="No file selected", foreground='#666')
         self.attachment_path_label.pack(side='left', padx=5)
@@ -336,16 +337,14 @@ class StockEmailSenderApp:
         ttk.Button(attachment_frame, text="Clear", command=self._clear_attachment).pack(side='left', padx=5)
         
         target_frame = ttk.LabelFrame(parent, text="Email Recipients", padding=10)
-        target_frame.grid(row=3, column=0, padx=15, pady=10, sticky='ew')
+        target_frame.grid(row=4, column=0, padx=15, pady=5, sticky='ew')
         
         self.send_to_selected_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(target_frame, text="Send to selected customers only (use selections from Customers tab)", 
+        ttk.Checkbutton(target_frame, text="Send to selected customers only", 
                         variable=self.send_to_selected_var).pack(anchor='w')
-        ttk.Label(target_frame, text="If unchecked, emails will be sent to all unsent customers.", 
-                  font=('Segoe UI', 8, 'italic'), foreground='#666').pack(anchor='w')
         
         progress_frame = ttk.LabelFrame(parent, text="Progress", padding=10)
-        progress_frame.grid(row=4, column=0, padx=15, pady=10, sticky='ew')
+        progress_frame.grid(row=5, column=0, padx=15, pady=5, sticky='ew')
         
         self.progress_bar = ttk.Progressbar(progress_frame, mode='determinate', length=400)
         self.progress_bar.pack(fill='x', pady=5)
@@ -356,24 +355,13 @@ class StockEmailSenderApp:
         self.send_stats_label = ttk.Label(progress_frame, text="Sent: 0 | Failed: 0 | Remaining: 0")
         self.send_stats_label.pack()
         
-        preview_frame = ttk.LabelFrame(parent, text="Email Preview", padding=10)
-        preview_frame.grid(row=5, column=0, padx=15, pady=10, sticky='ew')
+        preview_frame = ttk.LabelFrame(parent, text="Email Preview", padding=5)
+        preview_frame.grid(row=6, column=0, padx=15, pady=5, sticky='ew')
         
-        self.preview_text = scrolledtext.ScrolledText(preview_frame, height=8, wrap='word')
-        self.preview_text.pack(fill='both', expand=True)
+        self.preview_text = scrolledtext.ScrolledText(preview_frame, height=4, wrap='word')
+        self.preview_text.pack(fill='x')
         
-        ttk.Button(preview_frame, text="Preview Email", command=self._preview_email).pack(pady=5)
-        
-        btn_frame = ttk.Frame(parent)
-        btn_frame.grid(row=6, column=0, padx=15, pady=15)
-        
-        self.send_btn = ttk.Button(btn_frame, text="🚀 Send Emails", command=self._start_sending)
-        self.send_btn.pack(side='left', padx=5)
-        
-        self.stop_btn = ttk.Button(btn_frame, text="⏹ Stop", command=self._stop_sending, state='disabled')
-        self.stop_btn.pack(side='left', padx=5)
-        
-        ttk.Button(btn_frame, text="Refresh Stats", command=self._refresh_customer_count).pack(side='left', padx=5)
+        ttk.Button(preview_frame, text="Preview", command=self._preview_email).pack(pady=2)
     
     def _refresh_daily_stats(self):
         accounts = self.db.get_gmail_accounts()
@@ -604,6 +592,10 @@ class StockEmailSenderApp:
         
         for cust in customers:
             cust_id, email, store_code, mobile_number, status = cust
+            
+            sent_dates = self.db.get_sent_dates_for_customer(cust_id, days=3)
+            sent_history = ', '.join(sent_dates) if sent_dates else '-'
+            
             fail_count = fail_counts.get(cust_id, 0)
             if status == 'Sent':
                 status_display = 'Sent'
@@ -619,6 +611,7 @@ class StockEmailSenderApp:
                 store_code or '',
                 email,
                 mobile_number or '',
+                sent_history,
                 status_display
             ))
         
@@ -797,90 +790,29 @@ class StockEmailSenderApp:
             self._refresh_customers_list()
             messagebox.showinfo("Success", "All customers deleted")
     
-    def _add_stock_manual(self):
-        text = self.stock_text_entry.get('1.0', tk.END).strip()
-        if not text or text == "Enter stock data here (one per line or paste from Excel)...":
-            messagebox.showerror("Error", "Please enter stock data")
-            return
-        
-        lines = [line.strip() for line in text.split('\n') if line.strip()]
-        added = 0
-        for line in lines:
-            if line:
-                self.db.add_stock_data(line)
-                added += 1
-        
-        self.stock_text_entry.delete('1.0', tk.END)
-        self.stock_text_entry.insert('1.0', "Enter stock data here (one per line or paste from Excel)...")
-        
-        self._refresh_stocks_list()
-        messagebox.showinfo("Success", f"Added {added} stock entries")
-    
     def _upload_stocks_csv(self):
         file_path = filedialog.askopenfilename(
-            filetypes=[("Stock Files", "*.csv *.xlsx *.xls *.txt"), ("CSV Files", "*.csv"), ("Excel Files", "*.xlsx *.xls"), ("Text Files", "*.txt"), ("All Files", "*.*")]
+            filetypes=[("Excel Files", "*.xlsx *.xls"), ("CSV Files", "*.csv"), ("All Files", "*.*")]
         )
         
         if not file_path:
             return
         
-        self.db.clear_stock_data()
-        
-        try:
-            if file_path.lower().endswith('.csv'):
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    lines = f.read().strip().split('\n')
-                    if lines:
-                        for line in lines[1:]:
-                            if line.strip():
-                                row_values = [v.strip() for v in line.split(',')]
-                                formatted = ' | '.join(row_values)
-                                self.db.add_stock_data(formatted)
-            
-            elif file_path.lower().endswith(('.xlsx', '.xls')):
-                try:
-                    import openpyxl
-                except ImportError:
-                    messagebox.showerror("Error", "Excel support requires openpyxl library.\n\nInstall with: pip install openpyxl")
-                    return
-                
-                wb = openpyxl.load_workbook(file_path)
-                ws = wb.active
-                
-                for row in ws.iter_rows(min_row=1, values_only=True):
-                    if row and any(cell for cell in row):
-                        row_values = [str(cell).strip() if cell else '' for cell in row]
-                        formatted = ' | '.join(row_values)
-                        if formatted.strip(' |'):
-                            self.db.add_stock_data(formatted)
-                
-                wb.close()
-            
-            else:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    for line in f:
-                        if line.strip():
-                            self.db.add_stock_data(line.strip())
-        
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to read file: {str(e)}")
-            return
-        
-        self._refresh_stocks_list()
-        messagebox.showinfo("Success", "Stock data uploaded successfully!")
+        self.attachment_path = file_path
+        filename = file_path.split('/')[-1].split('\\')[-1]
+        self.attachment_path_label.config(text=filename, foreground='#28a745')
+        if hasattr(self, 'stock_file_label'):
+            self.stock_file_label.config(text=f"✓ {filename}", foreground='#28a745')
+        messagebox.showinfo("Success", f"Stock file selected: {filename}\n\nThis file will be attached to emails.")
     
     def _refresh_stocks_list(self):
-        for item in self.stocks_tree.get_children():
-            self.stocks_tree.delete(item)
-        
-        stocks = self.db.get_latest_stock_data()
-        for stock in stocks:
-            self.stocks_tree.insert('', 'end', values=(stock,))
+        pass
     
     def _clear_stocks(self):
-        if messagebox.askyesno("Confirm", "Clear all stock data?"):
-            self.db.clear_stock_data()
-            self._refresh_stocks_list()
+        self.attachment_path = None
+        self.attachment_path_label.config(text="No file selected", foreground='#666')
+        if hasattr(self, 'stock_file_label'):
+            self.stock_file_label.config(text="No file selected", foreground='#666')
     
     def _preview_email(self):
         html = get_stock_email_template_table(None, self.custom_message_entry.get().strip())
@@ -895,17 +827,8 @@ class StockEmailSenderApp:
             return
         
         if not self.attachment_path:
-            if not messagebox.askyesno("No Attachment", "No stock file attached. Send emails without attachment?"):
-                return
-        
-        stocks = self.db.get_latest_stock_data()
-        if not stocks:
-            messagebox.showerror("Error", "No stock data added. Please add stock data first.")
+            messagebox.showerror("Error", "Please select a stock file to attach.\n\nGo to Stock Data tab and upload your Excel/CSV file.")
             return
-        
-        if self.attachment_path:
-            if not messagebox.askyesno("Attachment Selected", f"File attached: {self.attachment_path.split('/')[-1].split(chr(92))[-1]}. Send emails?"):
-                return
         
         if self.send_to_selected_var.get():
             selected_ids = self._get_selected_customer_ids()
